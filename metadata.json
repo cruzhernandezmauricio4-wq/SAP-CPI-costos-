@@ -1,0 +1,5 @@
+{
+  "name": "SAP Integration Cost Architect",
+  "description": "Simulate, estimate, and optimize SAP Integration Suite (CPI) costs using FinOps principles.",
+  "requestFramePermissions": []
+}
