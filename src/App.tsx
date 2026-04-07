@@ -2266,8 +2266,10 @@ const FlowAnalyzer = ({ projects }: { projects: Project[] }) => {
   );
 };
 
-const SettingsView = () => {
+const SettingsView = ({ config, onSave }: { config: any, onSave: (c: any) => void }) => {
   const { t } = useTranslation();
+  const [localConfig, setLocalConfig] = useState(config);
+
   return (
     <div className="max-w-4xl space-y-8 animate-in fade-in duration-500">
       <div className="bg-white rounded-3xl p-6 md:p-8 border border-zinc-100 shadow-sm">
@@ -2276,11 +2278,21 @@ const SettingsView = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>
               <label className="text-sm font-bold text-zinc-700 mb-2 block">{t('Base Monthly Fee (USD)')}</label>
-              <input type="number" defaultValue={4000} className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              <input 
+                type="number" 
+                value={localConfig.baseFee} 
+                onChange={(e) => setLocalConfig({ ...localConfig, baseFee: parseInt(e.target.value) || 0 })}
+                className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" 
+              />
             </div>
             <div>
               <label className="text-sm font-bold text-zinc-700 mb-2 block">{t('Included Messages')}</label>
-              <input type="number" defaultValue={10000} className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              <input 
+                type="number" 
+                value={localConfig.includedMessages} 
+                onChange={(e) => setLocalConfig({ ...localConfig, includedMessages: parseInt(e.target.value) || 0 })}
+                className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" 
+              />
             </div>
           </div>
           
@@ -2292,7 +2304,13 @@ const SettingsView = () => {
                 <div className="hidden sm:block flex-1 h-px bg-zinc-200" />
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-zinc-400">$</span>
-                  <input type="number" defaultValue={0.10} step="0.01" className="w-full sm:w-20 bg-white border border-zinc-200 rounded-lg px-2 py-1 text-sm text-right" />
+                  <input 
+                    type="number" 
+                    value={localConfig.tier1Rate} 
+                    step="0.01" 
+                    onChange={(e) => setLocalConfig({ ...localConfig, tier1Rate: parseFloat(e.target.value) || 0 })}
+                    className="w-full sm:w-20 bg-white border border-zinc-200 rounded-lg px-2 py-1 text-sm text-right" 
+                  />
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
@@ -2300,7 +2318,13 @@ const SettingsView = () => {
                 <div className="hidden sm:block flex-1 h-px bg-zinc-200" />
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-zinc-400">$</span>
-                  <input type="number" defaultValue={0.05} step="0.01" className="w-full sm:w-20 bg-white border border-zinc-200 rounded-lg px-2 py-1 text-sm text-right" />
+                  <input 
+                    type="number" 
+                    value={localConfig.tier2Rate} 
+                    step="0.01" 
+                    onChange={(e) => setLocalConfig({ ...localConfig, tier2Rate: parseFloat(e.target.value) || 0 })}
+                    className="w-full sm:w-20 bg-white border border-zinc-200 rounded-lg px-2 py-1 text-sm text-right" 
+                  />
                 </div>
               </div>
             </div>
@@ -2344,8 +2368,18 @@ const SettingsView = () => {
       </div>
 
       <div className="flex flex-col sm:flex-row justify-end gap-4">
-        <button className="px-8 py-3 bg-zinc-100 text-zinc-700 rounded-2xl font-bold hover:bg-zinc-200 transition-all w-full sm:w-auto">{t('Discard Changes')}</button>
-        <button className="px-8 py-3 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all w-full sm:w-auto">{t('Save Configuration')}</button>
+        <button 
+          onClick={() => setLocalConfig(config)}
+          className="px-8 py-3 bg-zinc-100 text-zinc-700 rounded-2xl font-bold hover:bg-zinc-200 transition-all w-full sm:w-auto"
+        >
+          {t('Discard Changes')}
+        </button>
+        <button 
+          onClick={() => onSave(localConfig)}
+          className="px-8 py-3 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all w-full sm:w-auto"
+        >
+          {t('Save Configuration')}
+        </button>
       </div>
     </div>
   );
@@ -2370,21 +2404,53 @@ export default function App() {
   const [newProjectDesc, setNewProjectDesc] = useState('');
   const [newProjectBudget, setNewProjectBudget] = useState<number>(5000);
   const [newProjectTarget, setNewProjectTarget] = useState<number>(100000);
+  const [pricingModel, setPricingModel] = useState({
+    baseFee: 4000,
+    includedMessages: 10000,
+    tier1Rate: 0.10,
+    tier2Rate: 0.05
+  });
+  const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
+
+  const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 5000);
+  };
 
   const fetchProjects = useCallback(async () => {
-    const res = await fetch('/api/projects');
-    const data = await res.json();
-    setProjects(data);
-    if (data.length > 0 && !selectedProject) {
-      setSelectedProject(data[0]);
+    try {
+      const res = await fetch('/api/projects');
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setProjects(data);
+        if (data.length > 0 && !selectedProject) {
+          setSelectedProject(data[0]);
+        }
+      } else {
+        console.error("Projects data is not an array:", data);
+        setProjects([]);
+      }
+    } catch (error) {
+      console.error("Failed to fetch projects:", error);
+      setProjects([]);
     }
   }, [selectedProject]);
 
   const fetchIntegrations = useCallback(async () => {
     if (selectedProject) {
-      const res = await fetch(`/api/projects/${selectedProject.id}/integrations`);
-      const data = await res.json();
-      setIntegrations(data);
+      try {
+        const res = await fetch(`/api/projects/${selectedProject.id}/integrations`);
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setIntegrations(data);
+        } else {
+          console.error("Integrations data is not an array:", data);
+          setIntegrations([]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch integrations:", error);
+        setIntegrations([]);
+      }
     } else {
       setIntegrations([]);
     }
@@ -2400,23 +2466,33 @@ export default function App() {
 
   const handleCreateProject = async () => {
     if (!newProjectName) return;
-    const res = await fetch('/api/projects', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        name: newProjectName, 
-        description: newProjectDesc,
-        budget: newProjectBudget,
-        target_messages: newProjectTarget
-      })
-    });
-    if (res.ok) {
-      setShowNewProjectModal(false);
-      setNewProjectName('');
-      setNewProjectDesc('');
-      setNewProjectBudget(5000);
-      setNewProjectTarget(100000);
-      fetchProjects();
+    try {
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          name: newProjectName, 
+          description: newProjectDesc,
+          budget: newProjectBudget,
+          target_messages: newProjectTarget
+        })
+      });
+      
+      if (res.ok) {
+        setShowNewProjectModal(false);
+        setNewProjectName('');
+        setNewProjectDesc('');
+        setNewProjectBudget(5000);
+        setNewProjectTarget(100000);
+        fetchProjects();
+        showNotification(t('Project created successfully'));
+      } else {
+        const errorData = await res.json();
+        showNotification(errorData.message || t('Failed to create project'), 'error');
+      }
+    } catch (error) {
+      console.error("Error creating project:", error);
+      showNotification(t('Network error while creating project'), 'error');
     }
   };
 
@@ -2493,7 +2569,21 @@ export default function App() {
   return (
     <div className="flex h-screen bg-[#F8F9FA] font-sans text-zinc-900 overflow-hidden">
       <ErrorBoundary name="Sidebar">
-        <Sidebar 
+        {/* Notifications */}
+      {notification && (
+        <div className={cn(
+          "fixed top-6 right-6 z-[100] p-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-right-8 duration-300",
+          notification.type === 'success' ? "bg-emerald-500 text-white" : "bg-red-500 text-white"
+        )}>
+          {notification.type === 'success' ? <Zap className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
+          <span className="font-bold">{notification.message}</span>
+          <button onClick={() => setNotification(null)} className="ml-2 hover:opacity-70">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      <Sidebar 
           activeTab={activeTab} 
           setActiveTab={setActiveTab} 
           isOpen={sidebarOpen} 
@@ -2574,7 +2664,13 @@ export default function App() {
         )}
         {activeTab === 'settings' && (
           <ErrorBoundary name="SettingsView">
-            <SettingsView />
+            <SettingsView 
+              config={pricingModel} 
+              onSave={(newConfig) => {
+                setPricingModel(newConfig);
+                showNotification(t('Configuration saved successfully'));
+              }} 
+            />
           </ErrorBoundary>
         )}
         {activeTab === 'results' && simulationResult && (
