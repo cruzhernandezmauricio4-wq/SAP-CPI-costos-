@@ -35,11 +35,20 @@ export interface Integration {
   failure_rate?: number; // percentage (0-100)
   config: {
     steps: IntegrationStep[];
+    records_per_split?: number;
+    is_edge_integration?: boolean;
+    is_sap_standard?: boolean;
+    worker_nodes?: number;
+    request_reply_count?: number;
+    has_timer?: boolean;
+    has_internal_adapters?: boolean;
   };
   created_at: string;
 }
 
 export interface SimulationResult {
+  id?: number;
+  name?: string;
   monthlyMessages: number;
   estimatedCost: number;
   retries: number;
@@ -53,7 +62,23 @@ export interface SimulationResult {
     retryVolume?: number;
     failureRate?: number;
     steps?: IntegrationStep[];
+    // New breakdown fields
+    baseExecutions: number;
+    splitterFactor: number;
+    retryFactor: number;
+    requestReplyFactor: number;
+    edgeFactor: number;
+    totalBillableMessages: number;
+    blocksOf10K: number;
   };
+}
+
+export interface SimulationHistoryItem {
+  id: string;
+  name: string;
+  timestamp: string;
+  result: SimulationResult;
+  integration: Partial<Integration>;
 }
 
 export interface Recommendation {
